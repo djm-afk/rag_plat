@@ -13,6 +13,7 @@ MODELS = {
     "embedding": {
         "name": "moka-ai/m3e-base",
         "device": "cpu",  # 可换成gpu cuda加速
+        "score_threshold": 0.7,
         "encode_kwargs": {
             "normalize_embeddings": True,
             "batch_size": 32
@@ -35,3 +36,12 @@ PROCESSING = {
         ("###", "Header3")
     ]
 }
+
+# 搜索引擎
+SEARCH = {
+    "url": "http://192.168.18.93:8081",
+    "top_k": 15,
+    "time_out": 30,
+    "engine": ["360search", "sogou"]
+}
+

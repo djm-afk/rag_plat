@@ -2,23 +2,20 @@ from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain_openai.chat_models import ChatOpenAI
-from configs.settings import MODELS
+from utils.hybrid_retriver import HybridRetriever
+from configs.settings import MODELS,SEARCH
 
 
 class QASystemBuilder:
     """问答系统构造器"""
 
-    def __init__(self, vector_db):
-        self.retriever = self._init_retriever(vector_db=vector_db)
+    def __init__(self, vector_db, searxng_client, enable_web):
         self.llm = self._init_llm()
-
-    def _init_retriever(self, vector_db):
-        return vector_db.as_retriever(
-            search_type="similarity_score_threshold",  # 默认相似度搜索
-            search_kwargs={
-                "k": 3,                 # 召回数量
-                "score_threshold": 0.6  # 相似度门槛
-            },
+        # 初始化自定义检索器
+        self.retriever = HybridRetriever(
+            vector_db=vector_db,
+            searxng_client=searxng_client,
+            enable_web=enable_web,
         )
 
     def _init_llm(self) -> ChatOpenAI:
@@ -33,11 +30,19 @@ class QASystemBuilder:
         )
 
     def build_prompt(self) -> PromptTemplate:
-        """构造提示词模板"""
+        # 使用更健壮的模板格式
         template = """
         <|system|>
-        你是一个农业知识专家，请严格根据以下上下文回答问题，上下文中没有的就回答“上下文中未找到相关信息”：
+        你是一个实时信息助手，请按优先级使用以下资源：
+        1. 网络搜索结果（标记为🌐）
+        2. 本地知识库（标记为📚）
+
         {context}
+
+        **规则**：
+        1. 若网络搜索结果存在，优先使用并标注来源URL
+        2. 本地知识库仅用于补充网络结果
+        3. 完全无关时回答“未找到有效信息”
         </s>
         <|user|>
         问题：{question}</s>
@@ -45,7 +50,7 @@ class QASystemBuilder:
         """
         return PromptTemplate(
             template=template,
-            input_variables=["context", "question"]
+            input_variables=["context", "question"],
         )
 
     def create_chain(self) -> RetrievalQA:
